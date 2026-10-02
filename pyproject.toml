@@ -1,0 +1,21 @@
+[project]
+name = "reach"
+version = "0.1.0"
+description = "REACH Spark analytics and clinical oversight workbook helpers"
+readme = "README.md"
+authors = [
+    { name = "harmonycares" }
+]
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+aco = "reach._cli:main"
+reach-audit-pipe = "reach._pipes._audit_runner:main"
+reach-audit-copay = "reach._pipes._audit_runner:copay_main"
+reach-audit-giftcards = "reach._pipes._audit_runner:giftcards_main"
+reach-oversight-pipe = "reach._pipes._oversight_runner:main"
+
+[build-system]
+requires = ["uv_build>=0.11.2,<0.12.0"]
+build-backend = "uv_build"

@@ -1,0 +1,39 @@
+"""Notebook helpers for the REACH copay-waiver workbook."""
+
+from reach._notes._copay_waiver._workbook import (
+    DEFAULT_ATHENA_ACTIVITY_TABLE,
+    DEFAULT_ATHENA_TRANSACTION_TABLE,
+    DEFAULT_ALIGNMENT_OVERVIEW_TABLE,
+    DEFAULT_CENSUS_TABLE,
+    DEFAULT_CHARGE_TABLE,
+    DEFAULT_COST_TABLE,
+    DEFAULT_HCMPI_MASTER_TABLE,
+    DEFAULT_PATIENT_INSURANCE_TABLE,
+    DEFAULT_PARTICIPANT_LIST_TABLE,
+    DEFAULT_PROVIDER_ALIGNMENT_TABLE,
+    DEFAULT_PROVIDER_REFERENCE_TABLE,
+    DEFAULT_QUALITY_TABLE,
+    DEFAULT_UTILIZATION_TABLE,
+    build_copay_waiver_workbook,
+    build_reach_census_aligned_population,
+    load_copay_waiver_sources,
+)
+
+__all__ = [
+    "DEFAULT_ATHENA_ACTIVITY_TABLE",
+    "DEFAULT_ATHENA_TRANSACTION_TABLE",
+    "DEFAULT_ALIGNMENT_OVERVIEW_TABLE",
+    "DEFAULT_CENSUS_TABLE",
+    "DEFAULT_CHARGE_TABLE",
+    "DEFAULT_COST_TABLE",
+    "DEFAULT_HCMPI_MASTER_TABLE",
+    "DEFAULT_PATIENT_INSURANCE_TABLE",
+    "DEFAULT_PARTICIPANT_LIST_TABLE",
+    "DEFAULT_PROVIDER_ALIGNMENT_TABLE",
+    "DEFAULT_PROVIDER_REFERENCE_TABLE",
+    "DEFAULT_QUALITY_TABLE",
+    "DEFAULT_UTILIZATION_TABLE",
+    "build_copay_waiver_workbook",
+    "build_reach_census_aligned_population",
+    "load_copay_waiver_sources",
+]
