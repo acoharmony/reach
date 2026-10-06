@@ -151,12 +151,46 @@ display(
 # MAGIC %md
 # MAGIC ## 4. Copay Responsibility And Support
 # MAGIC
-# MAGIC The first displays are the no-secondary/no-tertiary audit funnel and its dollar reconciliation. Source-specific charge, Athena activity, and transaction totals are shown separately as diagnostics, not as a single balancing equation.
+# MAGIC The first displays are the no-secondary/no-tertiary audit funnel and its dollar reconciliation. The audit due amount is computed at beneficiary grain before summing: for each beneficiary, the pipe takes the larger of charge-source copay due and transaction-source patient-responsibility transfers. Residual responsibility is also computed at beneficiary grain and floored at zero, so it is not expected to equal the displayed aggregate due minus aggregate support minus aggregate payments.
 
 # COMMAND ----------
 
 no_coverage = F.col("no_secondary_or_tertiary_coverage_flag")
 no_coverage_due = no_coverage & (F.col("alignment_period_copay_due_without_secondary_amt") > 0)
+
+display(
+    spark.createDataFrame(
+        [
+            (
+                "Audit Copay Due",
+                "Sum of each beneficiary's larger alignment-window amount from charge copay due or transaction patient-responsibility transfers.",
+            ),
+            ("Charge Due Source Total", "Accepted financial.charge copay amounts for services inside each beneficiary's REACH alignment window."),
+            (
+                "Transfer Due Source Total",
+                "Athena transaction patient-responsibility transfer amounts for services inside each beneficiary's REACH alignment window.",
+            ),
+            ("REACH Support Applied", "REACH-coded Cost-Sharing Support adjustment transactions on alignment-window services."),
+            (
+                "Patient Copay Payments Applied",
+                "Patient payments matched to responsibility services, capped at the beneficiary audit copay due before residual responsibility is calculated.",
+            ),
+            (
+                "Residual Responsibility",
+                "Sum of beneficiary-level max(audit copay due - REACH support - applied patient payments, 0).",
+            ),
+            (
+                "Athena Activity Context",
+                "Performance-year activityfact rollup by activity date. It is not service-date aligned and should not be reconciled to the audit due row.",
+            ),
+            (
+                "Charge Residual Proxy",
+                "Charge-system copay less charge-system zeroed/write-off proxy. It is diagnostic context, not a REACH support or payment measure.",
+            ),
+        ],
+        ["Metric", "How To Read It"],
+    )
+)
 
 display(
     patients.agg(
@@ -180,22 +214,43 @@ display(
 
 display(
     responsibility.agg(
-        F.round(F.sum("alignment_period_copay_due_amt"), 2).alias("Audit Copay Due (Max Source)"),
-        F.round(F.sum("alignment_period_charge_copay_due_amt"), 2).alias("Charge-Source Copay Due"),
-        F.round(F.sum("alignment_period_patient_responsibility_transfer_amt"), 2).alias("Transaction-Source Patient Responsibility"),
-        F.round(F.sum("alignment_period_reach_cost_sharing_support_amt"), 2).alias("REACH Support Adjustments"),
-        F.round(F.sum("alignment_period_patient_payment_on_responsibility_service_amt"), 2).alias("Matched Patient Payments"),
-        F.round(F.sum("alignment_period_copay_unresolved_amt"), 2).alias("Residual After Support/Matched Payments"),
+        F.round(F.sum("alignment_period_copay_due_amt"), 2).alias("Audit Copay Due"),
+        F.round(F.sum("alignment_period_charge_copay_due_amt"), 2).alias("Charge Due Source Total"),
+        F.round(F.sum("alignment_period_patient_responsibility_transfer_amt"), 2).alias("Transfer Due Source Total"),
+        F.round(F.sum("alignment_period_reach_cost_sharing_support_amt"), 2).alias("REACH Support Applied"),
+        F.round(F.sum("alignment_period_patient_copay_payment_amt"), 2).alias("Patient Copay Payments Applied"),
+        F.round(F.sum("alignment_period_copay_unresolved_amt"), 2).alias("Residual Responsibility"),
     )
 )
 
 display(
     responsibility.agg(
-        F.round(F.sum("athena_copay_due_amt"), 2).alias("Athena Activity Copay Due (Context Only)"),
-        F.round(F.sum("posted_rev_cycle_patient_payment_amt"), 2).alias("All Posted Patient Payments"),
+        F.round(
+            F.sum("alignment_period_copay_due_amt")
+            - F.sum("alignment_period_reach_cost_sharing_support_amt")
+            - F.sum("alignment_period_patient_copay_payment_amt"),
+            2,
+        ).alias("Aggregate Due Less Support/Payments"),
+        F.round(F.sum("alignment_period_copay_unresolved_amt"), 2).alias("Sum Of Beneficiary-Floored Residuals"),
+        F.round(
+            F.sum("alignment_period_copay_unresolved_amt")
+            - (
+                F.sum("alignment_period_copay_due_amt")
+                - F.sum("alignment_period_reach_cost_sharing_support_amt")
+                - F.sum("alignment_period_patient_copay_payment_amt")
+            ),
+            2,
+        ).alias("Beneficiary-Level Floor Difference"),
+    )
+)
+
+display(
+    responsibility.agg(
+        F.round(F.sum("athena_copay_due_amt"), 2).alias("Athena Activity Copay Due Context"),
+        F.round(F.sum("posted_rev_cycle_patient_payment_amt"), 2).alias("All Posted Patient Payments Context"),
         F.round(F.sum("pre_alignment_patient_payment_amt"), 2).alias("Pre-Alignment Patient Payments"),
         F.round(F.sum("alignment_period_patient_payment_amt"), 2).alias("Alignment-Period Patient Payments"),
-        F.round(F.sum("alignment_period_charge_proxy_copay_residual_amt"), 2).alias("Charge Residual Proxy (Context Only)"),
+        F.round(F.sum("alignment_period_charge_proxy_copay_residual_amt"), 2).alias("Charge Residual Proxy Context"),
     )
 )
 
