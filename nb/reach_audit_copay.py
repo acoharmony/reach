@@ -151,36 +151,51 @@ display(
 # MAGIC %md
 # MAGIC ## 4. Copay Responsibility And Support
 # MAGIC
-# MAGIC Dollars are service-date aware. Alignment-period amounts only count services dated inside the beneficiary REACH alignment window; pre-alignment and all-posted revenue-cycle payments are shown only as context.
+# MAGIC The first displays are the no-secondary/no-tertiary audit funnel and its dollar reconciliation. Source-specific charge, Athena activity, and transaction totals are shown separately as diagnostics, not as a single balancing equation.
 
 # COMMAND ----------
+
+no_coverage = F.col("no_secondary_or_tertiary_coverage_flag")
+no_coverage_due = no_coverage & (F.col("alignment_period_copay_due_without_secondary_amt") > 0)
 
 display(
     patients.agg(
         F.countDistinct("hcmpi").alias("Aligned Beneficiaries"),
         F.countDistinct(F.when(F.lower(F.col("lc_status_current")) == "active - engaged", F.col("hcmpi"))).alias("Active-Engaged Beneficiaries"),
-        F.countDistinct(F.when(F.col("no_secondary_or_tertiary_coverage_flag"), F.col("hcmpi"))).alias("No Secondary/Tertiary Coverage"),
-        F.countDistinct(F.when(F.col("alignment_period_copay_due_without_secondary_amt") > 0, F.col("hcmpi"))).alias("No Coverage + Alignment-Period Copay Due"),
-        F.countDistinct(F.when(F.col("copays_waived_flag"), F.col("hcmpi"))).alias("Cost-Sharing Support Beneficiaries"),
-        F.round(F.sum("alignment_period_copay_due_without_secondary_amt"), 2).alias("Alignment-Period Copay Due Without Coverage"),
-        F.round(F.sum("alignment_period_copay_waived_amt"), 2).alias("Alignment-Period Cost-Sharing Support"),
-        F.round(F.sum("alignment_period_patient_copay_payment_amt"), 2).alias("Alignment-Period Patient Copay Payments"),
-        F.round(F.sum("alignment_period_copay_unresolved_amt"), 2).alias("Alignment-Period Unresolved Copay Responsibility"),
+        F.countDistinct(F.when(no_coverage, F.col("hcmpi"))).alias("No Secondary/Tertiary Coverage"),
+        F.countDistinct(F.when(no_coverage_due, F.col("hcmpi"))).alias("No Coverage With Copay Due"),
+        F.countDistinct(F.when(F.col("copays_waived_flag"), F.col("hcmpi"))).alias("No Coverage With REACH Support"),
+        F.countDistinct(F.when(no_coverage_due & ~F.col("copays_waived_flag"), F.col("hcmpi"))).alias("No Coverage Due Without Support"),
+    )
+)
+
+display(
+    patients.where(no_coverage).agg(
+        F.round(F.sum("alignment_period_copay_due_without_secondary_amt"), 2).alias("No-Coverage Copay Due"),
+        F.round(F.sum("alignment_period_cost_sharing_support_amt"), 2).alias("No-Coverage REACH Support"),
+        F.round(F.sum("alignment_period_patient_copay_payment_amt"), 2).alias("No-Coverage Patient Copay Payments"),
+        F.round(F.sum("alignment_period_copay_unresolved_amt"), 2).alias("No-Coverage Unresolved Responsibility"),
     )
 )
 
 display(
     responsibility.agg(
-        F.round(F.sum("alignment_period_charge_copay_due_amt"), 2).alias("Alignment-Period Charge Copay Due"),
-        F.round(F.sum("athena_copay_due_amt"), 2).alias("Athena Activity Copay Due Context"),
-        F.round(F.sum("alignment_period_patient_responsibility_transfer_amt"), 2).alias("Alignment-Period Patient Responsibility"),
-        F.round(F.sum("alignment_period_reach_cost_sharing_support_amt"), 2).alias("Alignment-Period REACH Support"),
-        F.round(F.sum("posted_rev_cycle_patient_payment_amt"), 2).alias("All 2026-Posted Patient Payments"),
-        F.round(F.sum("alignment_period_patient_payment_on_responsibility_service_amt"), 2).alias("Alignment-Period Payments On Responsibility Services"),
-        F.round(F.sum("alignment_period_patient_copay_payment_amt"), 2).alias("Alignment-Period Patient Copay Payments"),
-        F.round(F.sum("alignment_period_copay_unresolved_amt"), 2).alias("Alignment-Period Unresolved Copay Responsibility"),
-        F.round(F.sum("alignment_period_charge_proxy_copay_residual_amt"), 2).alias("Alignment-Period Charge Residual Proxy"),
+        F.round(F.sum("alignment_period_copay_due_amt"), 2).alias("Audit Copay Due (Max Source)"),
+        F.round(F.sum("alignment_period_charge_copay_due_amt"), 2).alias("Charge-Source Copay Due"),
+        F.round(F.sum("alignment_period_patient_responsibility_transfer_amt"), 2).alias("Transaction-Source Patient Responsibility"),
+        F.round(F.sum("alignment_period_reach_cost_sharing_support_amt"), 2).alias("REACH Support Adjustments"),
+        F.round(F.sum("alignment_period_patient_payment_on_responsibility_service_amt"), 2).alias("Matched Patient Payments"),
+        F.round(F.sum("alignment_period_copay_unresolved_amt"), 2).alias("Residual After Support/Matched Payments"),
+    )
+)
+
+display(
+    responsibility.agg(
+        F.round(F.sum("athena_copay_due_amt"), 2).alias("Athena Activity Copay Due (Context Only)"),
+        F.round(F.sum("posted_rev_cycle_patient_payment_amt"), 2).alias("All Posted Patient Payments"),
         F.round(F.sum("pre_alignment_patient_payment_amt"), 2).alias("Pre-Alignment Patient Payments"),
+        F.round(F.sum("alignment_period_patient_payment_amt"), 2).alias("Alignment-Period Patient Payments"),
+        F.round(F.sum("alignment_period_charge_proxy_copay_residual_amt"), 2).alias("Charge Residual Proxy (Context Only)"),
     )
 )
 
