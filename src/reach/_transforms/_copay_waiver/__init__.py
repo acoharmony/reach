@@ -7,6 +7,12 @@ from reach._transforms._copay_waiver._cost_context import build_copay_waiver_pat
 from reach._transforms._copay_waiver._coverage_status import build_copay_waiver_coverage_status
 from reach._transforms._copay_waiver._measure_diffs import build_copay_waiver_measure_diffs
 from reach._transforms._copay_waiver._not_waived_patients import build_copay_waiver_no_secondary_due_not_waived_patients
+from reach._transforms._copay_waiver._observability import (
+    build_copay_waiver_check_results,
+    build_copay_waiver_service_trace,
+    build_copay_waiver_stage_manifest,
+    build_copay_waiver_stage_metrics,
+)
 from reach._transforms._copay_waiver._patient_profile import build_copay_waiver_patient_profile
 from reach._transforms._copay_waiver._patient_responsibility import build_copay_waiver_patient_responsibility
 from reach._transforms._copay_waiver._revenue_cycle_transactions import build_copay_waiver_revenue_cycle_transactions
@@ -18,6 +24,7 @@ from reach._transforms._copay_waiver._summaries import (
 )
 from reach._transforms._copay_waiver._views import (
     ATHENA_PATIENT_COPAY_ACTIVITY_VIEW,
+    COPAY_WAIVER_CHECK_RESULTS_VIEW,
     COPAY_WAIVER_COHORT_DIFFS_VIEW,
     COPAY_WAIVER_COVERAGE_STATUS_VIEW,
     COPAY_WAIVER_MEASURE_DIFFS_VIEW,
@@ -28,6 +35,9 @@ from reach._transforms._copay_waiver._views import (
     COPAY_WAIVER_POPULATION_SUMMARY_VIEW,
     COPAY_WAIVER_REVENUE_CYCLE_TRANSACTIONS_VIEW,
     COPAY_WAIVER_SEGMENT_BREAKDOWN_VIEW,
+    COPAY_WAIVER_SERVICE_TRACE_VIEW,
+    COPAY_WAIVER_STAGE_MANIFEST_VIEW,
+    COPAY_WAIVER_STAGE_METRICS_VIEW,
     COPAY_WAIVER_SUPPORT_SERVICE_DETAIL_VIEW,
     DEFAULT_ALIGNED_COLUMNS,
     DEFAULT_NUMERIC_DIFF_COLUMNS,
@@ -38,6 +48,7 @@ from reach._transforms._copay_waiver._views import (
 
 __all__ = [
     "ATHENA_PATIENT_COPAY_ACTIVITY_VIEW",
+    "COPAY_WAIVER_CHECK_RESULTS_VIEW",
     "COPAY_WAIVER_COHORT_DIFFS_VIEW",
     "COPAY_WAIVER_COVERAGE_STATUS_VIEW",
     "COPAY_WAIVER_MEASURE_DIFFS_VIEW",
@@ -48,6 +59,9 @@ __all__ = [
     "COPAY_WAIVER_POPULATION_SUMMARY_VIEW",
     "COPAY_WAIVER_REVENUE_CYCLE_TRANSACTIONS_VIEW",
     "COPAY_WAIVER_SEGMENT_BREAKDOWN_VIEW",
+    "COPAY_WAIVER_SERVICE_TRACE_VIEW",
+    "COPAY_WAIVER_STAGE_MANIFEST_VIEW",
+    "COPAY_WAIVER_STAGE_METRICS_VIEW",
     "COPAY_WAIVER_SUPPORT_SERVICE_DETAIL_VIEW",
     "DEFAULT_ALIGNED_COLUMNS",
     "DEFAULT_NUMERIC_DIFF_COLUMNS",
@@ -56,6 +70,7 @@ __all__ = [
     "REACH_ALIGNMENT_COUNT_REFERENCE_VIEW",
     "build_athena_patient_copay_activity",
     "build_reach_alignment_count_reference",
+    "build_copay_waiver_check_results",
     "build_copay_waiver_cohort_diffs",
     "build_copay_waiver_coverage_status",
     "build_copay_waiver_measure_diffs",
@@ -66,6 +81,9 @@ __all__ = [
     "build_copay_waiver_revenue_cycle_transactions",
     "build_copay_waiver_population_summary",
     "build_copay_waiver_segment_breakdown",
+    "build_copay_waiver_service_trace",
+    "build_copay_waiver_stage_manifest",
+    "build_copay_waiver_stage_metrics",
     "build_copay_waiver_support_service_detail",
     "build_reach_census_aligned_population",
 ]

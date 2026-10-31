@@ -32,6 +32,10 @@ TABLES = {
     "exceptions": "reach_audit_copay_no_secondary_due_not_waived_patients",
     "cohort_diffs": "reach_audit_copay_cohort_diffs",
     "measure_diffs": "reach_audit_copay_measure_diffs",
+    "stage_manifest": "reach_audit_copay_stage_manifest",
+    "stage_metrics": "reach_audit_copay_stage_metrics",
+    "check_results": "reach_audit_copay_check_results",
+    "service_trace": "reach_audit_copay_service_trace",
     "run_summary": "reach_audit_copay_run_summary",
 }
 
@@ -51,6 +55,18 @@ SOURCE_TABLES = [
     ("Utilization", "prd_silver.patient_metrics.patient_registry_util_cost", "The same 90-day/365-day utilization metrics used by the clinical oversight report."),
     ("Quality", "prd_silver.quality.patient_quality_metrics", "Quality-measure comparison context."),
     ("Provider reference", "prd_silver.organization.provider", "Rendering and ACO participant provider names/NPIs for service detail."),
+]
+
+REVIEW_PULL_ORDER = [
+    (1, "Can I use this run?", "check_results", "Show fail, then warn, then pass. Resolve fail rows before using any summary dollars."),
+    (2, "What changed at each transformation?", "stage_metrics", "Read in stage order. Check row-count, date-range, and dollar jumps."),
+    (3, "How was each table generated?", "stage_manifest", "Read in stage order when a reviewer needs source, dependency, grain, or join-key context."),
+    (4, "Which patients have copay due and no support?", "exceptions", "Sort by unresolved responsibility, then copay due, then clinician."),
+    (5, "Which REACH support codes are in the data?", "service_trace", "Filter to support transactions and sort by support amount; use trace_decision to separate included rows from review rows."),
+    (6, "Which service rows support the CMS audit file?", "support_detail", "Sort by support amount, beneficiary, service date, transaction."),
+    (7, "Which beneficiaries received support?", "patients", "Filter to copays_waived_flag and sort by support amount."),
+    (8, "How was coverage decided?", "coverage_status", "Group by coverage_decision_source, then inspect high-volume payer groups."),
+    (9, "How do supported patients compare to the rest?", "cohort_diffs / measure_diffs", "Sort by absolute differences so large signal rises first."),
 ]
 
 
@@ -74,6 +90,11 @@ def pct(part, whole):
     return F.when(whole == 0, F.lit(None).cast("double")).otherwise(part / whole)
 
 
+def status_rank(column):
+    value = F.lower(F.col(column))
+    return F.when(value == "fail", F.lit(1)).when(value == "warn", F.lit(2)).when(value == "pass", F.lit(3)).otherwise(F.lit(9))
+
+
 coverage_status = spark.table(table_name("coverage_status"))
 responsibility = spark.table(table_name("responsibility"))
 patients = spark.table(table_name("patients"))
@@ -81,6 +102,10 @@ support_detail = spark.table(table_name("support_detail"))
 exceptions = spark.table(table_name("exceptions"))
 cohort_diffs = spark.table(table_name("cohort_diffs"))
 measure_diffs = spark.table(table_name("measure_diffs"))
+stage_manifest = spark.table(table_name("stage_manifest"))
+stage_metrics = spark.table(table_name("stage_metrics"))
+check_results = spark.table(table_name("check_results"))
+service_trace = spark.table(table_name("service_trace"))
 run_summary = spark.table(table_name("run_summary"))
 
 # COMMAND ----------
@@ -96,19 +121,76 @@ latest_run = run_summary.where(F.col("pipe_name") == PIPE_NAME).agg(F.max("run_s
 display(
     run_summary.where(F.col("pipe_name") == PIPE_NAME)
     .join(latest_run, on="run_started_at", how="inner")
+    .join(stage_manifest.select("output_name", "stage_order"), on="output_name", how="left")
     .select(
+        F.col("stage_order").alias("Stage"),
         F.col("output_name").alias("Output"),
         F.col("row_count").alias("Rows"),
         F.col("output_table").alias("Table"),
         F.col("run_started_at").alias("Run Started At"),
     )
-    .orderBy("Output")
+    .orderBy("Stage", "Output")
 )
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 2. Source Tables
+# MAGIC ## 2. Transformation Observability
+# MAGIC
+# MAGIC Review checks and stage-level metrics written by the materialized audit pipe.
+
+# COMMAND ----------
+
+display(spark.createDataFrame(REVIEW_PULL_ORDER, ["Step", "Reviewer Question", "Table", "Filter And Sort"]))
+
+display(
+    check_results.select(
+        F.col("check_status").alias("Status"),
+        F.col("check_name").alias("Check"),
+        F.col("observed_value").alias("Observed"),
+        F.col("expected_value").alias("Expected"),
+        F.col("reviewer_note").alias("Reviewer Note"),
+        status_rank("check_status").alias("_status_rank"),
+    )
+    .orderBy("_status_rank", "Check")
+    .drop("_status_rank")
+)
+
+display(
+    stage_metrics.select(
+        F.col("stage_order").alias("Stage"),
+        F.col("output_name").alias("Output"),
+        F.col("row_count").alias("Rows"),
+        F.col("beneficiary_count").alias("Beneficiaries"),
+        F.col("transaction_count").alias("Transactions"),
+        F.col("claim_count").alias("Claims"),
+        F.col("charge_count").alias("Charges"),
+        F.col("support_transaction_count").alias("Support Transactions"),
+        F.round("alignment_period_copay_due_amt", 2).alias("Copay Due"),
+        F.round("alignment_period_reach_cost_sharing_support_amt", 2).alias("REACH Support"),
+        F.round("alignment_period_patient_copay_payment_amt", 2).alias("Patient Payments"),
+        F.round("alignment_period_copay_unresolved_amt", 2).alias("Residual"),
+        F.col("min_observed_date").alias("Min Date"),
+        F.col("max_observed_date").alias("Max Date"),
+    ).orderBy("Stage")
+)
+
+display(
+    stage_manifest.select(
+        F.col("stage_order").alias("Stage"),
+        F.col("output_name").alias("Output"),
+        F.col("grain").alias("Grain"),
+        F.col("source_tables_or_inputs").alias("Sources"),
+        F.col("depends_on_outputs").alias("Depends On"),
+        F.col("primary_join_keys").alias("Join Keys"),
+        F.col("transformation_purpose").alias("Purpose"),
+    ).orderBy("Stage")
+)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 3. Source Tables
 # MAGIC
 # MAGIC Primary input tables and files used by the materialized audit pipe.
 
@@ -119,7 +201,7 @@ display(spark.createDataFrame(SOURCE_TABLES, ["Role", "Source", "Use"]))
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 3. Coverage Decision
+# MAGIC ## 4. Coverage Decision
 # MAGIC
 # MAGIC Secondary coverage is decided from active performance-year `financial.patient_insurance` priority 2 rows. Real priority 3 rows count as tertiary coverage; self-pay/no-coverage priority 3 rows are only shown as context.
 
@@ -136,8 +218,14 @@ display(
 )
 display(
     coverage_status.groupBy("coverage_decision_source")
-    .agg(F.countDistinct("hcmpi").alias("Beneficiaries"))
-    .orderBy(F.desc("Beneficiaries"))
+    .agg(
+        F.countDistinct("hcmpi").alias("Beneficiaries"),
+        F.sum("patient_secondary_insurance_package_count").alias("Secondary Package Rows"),
+        F.sum("patient_tertiary_insurance_package_count").alias("Tertiary Package Rows"),
+        F.sum("claim_time_secondary_coverage_charge_count").alias("Claim-Time Secondary Charges"),
+        F.sum("claim_time_tertiary_coverage_charge_count").alias("Claim-Time Tertiary Charges"),
+    )
+    .orderBy(F.desc("Beneficiaries"), "coverage_decision_source")
 )
 display(
     coverage_status.where(F.col("has_patient_secondary_coverage"))
@@ -149,7 +237,7 @@ display(
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 4. Copay Responsibility And Support
+# MAGIC ## 5. Copay Responsibility And Support
 # MAGIC
 # MAGIC The first displays are the no-secondary/no-tertiary audit funnel and its dollar reconciliation. The audit due amount is computed at beneficiary grain before summing: for each beneficiary, the pipe takes the larger of charge-source copay due and transaction-source patient-responsibility transfers. Residual responsibility is also computed at beneficiary grain and floored at zero, so it is not expected to equal the displayed aggregate due minus aggregate support minus aggregate payments.
 
@@ -257,9 +345,64 @@ display(
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 5. Cost-Sharing Support Detail
+# MAGIC ## 6. Cost-Sharing Support Detail
 # MAGIC
 # MAGIC Beneficiary, Part B service, service date, support amount, and furnishing/ACO participant provider.
+
+# COMMAND ----------
+
+display(
+    service_trace.where(F.col("cost_sharing_support_identified_flag"))
+    .withColumn(
+        "_trace_rank",
+        F.when(F.col("trace_decision") == "included_support_on_no_coverage_alignment_service", F.lit(1))
+        .when(F.col("trace_decision") == "review_support_beneficiary_has_secondary_or_tertiary_coverage", F.lit(2))
+        .when(F.col("trace_decision") == "excluded_support_outside_alignment_service_window", F.lit(3))
+        .otherwise(F.lit(9)),
+    )
+    .groupBy("custom_transaction_code", "trace_decision")
+    .agg(
+        F.min("_trace_rank").alias("_trace_rank"),
+        F.countDistinct("transaction_id").alias("Support Transactions"),
+        F.countDistinct("hcmpi").alias("Beneficiaries"),
+        F.round(F.sum("cost_sharing_support_amt"), 2).alias("Support Amount"),
+    )
+    .orderBy("_trace_rank", F.desc("Support Amount"), "custom_transaction_code", "trace_decision")
+    .drop("_trace_rank")
+)
+
+# COMMAND ----------
+
+display(
+    service_trace.where(F.col("cost_sharing_support_identified_flag"))
+    .withColumn(
+        "_trace_rank",
+        F.when(F.col("trace_decision") == "included_support_on_no_coverage_alignment_service", F.lit(1))
+        .when(F.col("trace_decision") == "review_support_beneficiary_has_secondary_or_tertiary_coverage", F.lit(2))
+        .when(F.col("trace_decision") == "excluded_support_outside_alignment_service_window", F.lit(3))
+        .otherwise(F.lit(9)),
+    )
+    .select(
+        F.col("trace_decision").alias("Trace Decision"),
+        F.col("beneficiary_identity").alias("Beneficiary"),
+        F.col("hcmpi").alias("HCMPI"),
+        F.col("medicarebeneficiaryid").alias("MBI"),
+        F.col("service_from_dt").alias("Service Date"),
+        F.col("transaction_post_dt").alias("Post Date"),
+        F.col("custom_transaction_code").alias("Support Code"),
+        F.round("cost_sharing_support_amt", 2).alias("Support Amount"),
+        F.col("coverage_decision_source").alias("Coverage Decision"),
+        F.col("service_in_reach_alignment_window_flag").alias("Service In Alignment Window"),
+        F.col("no_secondary_or_tertiary_coverage_flag").alias("No Secondary/Tertiary Coverage"),
+        F.col("transaction_id").alias("Transaction"),
+        F.col("claim_id").alias("Claim"),
+        F.col("charge_id").alias("Charge"),
+        F.col("part_b_service_nature").alias("Part B Service"),
+        F.col("_trace_rank"),
+    )
+    .orderBy("_trace_rank", F.desc("Support Amount"), "Beneficiary", "Service Date", "Transaction")
+    .drop("_trace_rank")
+)
 
 # COMMAND ----------
 
@@ -289,12 +432,15 @@ support_columns = (
     ("support_transaction_id", "Transaction"),
 )
 
-display(select_labeled(support_detail, support_columns, "support service detail").orderBy("Beneficiary", "Service Date", "Transaction"))
+display(
+    select_labeled(support_detail, support_columns, "support service detail")
+    .orderBy(F.desc("Support Amount"), "Beneficiary", "Service Date", "Transaction")
+)
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 6. Copay Due But No Support
+# MAGIC ## 7. Copay Due But No Support Review Queue
 # MAGIC
 # MAGIC Beneficiaries with no active priority-2 secondary or real priority-3 tertiary coverage, an alignment-period copay due amount, and no identified alignment-period Cost-Sharing Support.
 
@@ -325,12 +471,20 @@ exception_columns = (
     ("alignment_period_copay_unresolved_amt", "Alignment-Period Unresolved Responsibility"),
 )
 
-display(select_labeled(exceptions, exception_columns, "no-secondary due-not-waived patients").orderBy("Clinician", "Beneficiary"))
+display(
+    select_labeled(exceptions, exception_columns, "no-secondary due-not-waived patients")
+    .orderBy(
+        F.desc("Alignment-Period Unresolved Responsibility"),
+        F.desc("Alignment-Period Copay Due Without Coverage"),
+        "Clinician",
+        "Beneficiary",
+    )
+)
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 7. Supported Beneficiaries
+# MAGIC ## 8. Supported Beneficiaries
 # MAGIC
 # MAGIC One row per beneficiary who received support, with demographics, clinician, cost, risk, and utilization context.
 
@@ -365,7 +519,7 @@ display(
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 8. Supported Versus Other Aligned Beneficiaries
+# MAGIC ## 9. Supported Versus Other Aligned Beneficiaries
 # MAGIC
 # MAGIC Clinical-overview-style utilization, spend, and risk comparisons for supported versus other aligned beneficiaries.
 
@@ -383,10 +537,12 @@ display(
         F.round(F.col("d.waived_avg_value"), 2).alias("Supported Avg"),
         F.round(F.col("d.not_waived_avg_value"), 2).alias("Other Avg"),
         F.round(F.col("d.avg_diff_waived_minus_not"), 2).alias("Avg Difference"),
+        F.abs(F.round(F.col("d.avg_diff_waived_minus_not"), 2)).alias("_abs_avg_difference"),
         F.round(F.col("d.waived_sum_value"), 2).alias("Supported Sum"),
         F.round(F.col("d.not_waived_sum_value"), 2).alias("Other Sum"),
     )
-    .orderBy(F.col("Metric"))
+    .orderBy(F.desc("_abs_avg_difference"), "Metric")
+    .drop("_abs_avg_difference")
 )
 
 display(
@@ -398,8 +554,10 @@ display(
         F.round("waived_rate", 4).alias("Supported Rate"),
         F.round("not_waived_rate", 4).alias("Other Rate"),
         F.round("rate_diff_waived_minus_not", 4).alias("Rate Difference"),
+        F.abs(F.round("rate_diff_waived_minus_not", 4)).alias("_abs_rate_difference"),
     )
-    .orderBy("Measure")
+    .orderBy(F.desc("_abs_rate_difference"), "Measure")
+    .drop("_abs_rate_difference")
 )
 
 # COMMAND ----------

@@ -21,6 +21,10 @@ COPAY_OUTPUT_TABLE_SUFFIXES: Mapping[str, str] = {
     "no_secondary_copay_due_not_waived_patients": "reach_audit_copay_no_secondary_due_not_waived_patients",
     "cohort_diffs": "reach_audit_copay_cohort_diffs",
     "measure_diffs": "reach_audit_copay_measure_diffs",
+    "stage_manifest": "reach_audit_copay_stage_manifest",
+    "stage_metrics": "reach_audit_copay_stage_metrics",
+    "check_results": "reach_audit_copay_check_results",
+    "service_trace": "reach_audit_copay_service_trace",
 }
 
 COPAY_STAGE_OUTPUTS: Mapping[str, str] = {
@@ -38,6 +42,10 @@ COPAY_STAGE_OUTPUTS: Mapping[str, str] = {
     "reach_audit_copay_no_secondary_due_not_waived": "no_secondary_copay_due_not_waived_patients",
     "reach_audit_copay_cohort_diffs": "cohort_diffs",
     "reach_audit_copay_measure_diffs": "measure_diffs",
+    "reach_audit_copay_stage_manifest": "stage_manifest",
+    "reach_audit_copay_stage_metrics": "stage_metrics",
+    "reach_audit_copay_check_results": "check_results",
+    "reach_audit_copay_service_trace": "service_trace",
 }
 
 GIFTCARD_OUTPUT_TABLE_SUFFIXES: Mapping[str, str] = {

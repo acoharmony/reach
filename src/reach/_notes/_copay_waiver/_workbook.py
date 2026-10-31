@@ -7,6 +7,7 @@ from pyspark.sql import DataFrame
 from reach._transforms._copay_waiver import (
     ATHENA_PATIENT_COPAY_ACTIVITY_VIEW,
     COPAY_WAIVER_COHORT_DIFFS_VIEW,
+    COPAY_WAIVER_CHECK_RESULTS_VIEW,
     COPAY_WAIVER_COVERAGE_STATUS_VIEW,
     COPAY_WAIVER_MEASURE_DIFFS_VIEW,
     COPAY_WAIVER_NOT_WAIVED_PATIENTS_VIEW,
@@ -16,10 +17,14 @@ from reach._transforms._copay_waiver import (
     COPAY_WAIVER_POPULATION_SUMMARY_VIEW,
     COPAY_WAIVER_REVENUE_CYCLE_TRANSACTIONS_VIEW,
     COPAY_WAIVER_SEGMENT_BREAKDOWN_VIEW,
+    COPAY_WAIVER_SERVICE_TRACE_VIEW,
+    COPAY_WAIVER_STAGE_MANIFEST_VIEW,
+    COPAY_WAIVER_STAGE_METRICS_VIEW,
     COPAY_WAIVER_SUPPORT_SERVICE_DETAIL_VIEW,
     REACH_ALIGNED_POPULATION_VIEW,
     REACH_ALIGNMENT_COUNT_REFERENCE_VIEW,
     build_athena_patient_copay_activity,
+    build_copay_waiver_check_results,
     build_copay_waiver_cohort_diffs,
     build_copay_waiver_coverage_status,
     build_copay_waiver_measure_diffs,
@@ -30,6 +35,9 @@ from reach._transforms._copay_waiver import (
     build_copay_waiver_population_summary,
     build_copay_waiver_revenue_cycle_transactions,
     build_copay_waiver_segment_breakdown,
+    build_copay_waiver_service_trace,
+    build_copay_waiver_stage_manifest,
+    build_copay_waiver_stage_metrics,
     build_copay_waiver_support_service_detail,
     build_reach_alignment_count_reference,
     build_reach_census_aligned_population,
@@ -173,16 +181,7 @@ def build_copay_waiver_workbook(
         sources["quality_metrics"],
         performance_year=performance_year,
     )
-
-    cost_context.createOrReplaceTempView(COPAY_WAIVER_PATIENT_COST_CONTEXT_VIEW)
-    summary.createOrReplaceTempView(COPAY_WAIVER_POPULATION_SUMMARY_VIEW)
-    segments.createOrReplaceTempView(COPAY_WAIVER_SEGMENT_BREAKDOWN_VIEW)
-    support_service_detail.createOrReplaceTempView(COPAY_WAIVER_SUPPORT_SERVICE_DETAIL_VIEW)
-    not_waived_patients.createOrReplaceTempView(COPAY_WAIVER_NOT_WAIVED_PATIENTS_VIEW)
-    cohort_diffs.createOrReplaceTempView(COPAY_WAIVER_COHORT_DIFFS_VIEW)
-    measure_diffs.createOrReplaceTempView(COPAY_WAIVER_MEASURE_DIFFS_VIEW)
-
-    return {
+    base_outputs = {
         "aligned_population": aligned,
         "alignment_count_reference": alignment_counts,
         "coverage_status": coverage_status,
@@ -197,6 +196,30 @@ def build_copay_waiver_workbook(
         "no_secondary_copay_due_not_waived_patients": not_waived_patients,
         "cohort_diffs": cohort_diffs,
         "measure_diffs": measure_diffs,
+    }
+    stage_manifest = build_copay_waiver_stage_manifest(spark)
+    stage_metrics = build_copay_waiver_stage_metrics(base_outputs)
+    check_results = build_copay_waiver_check_results(patient_profile, revenue_cycle_transactions, support_service_detail)
+    service_trace = build_copay_waiver_service_trace(patient_profile, revenue_cycle_transactions)
+
+    cost_context.createOrReplaceTempView(COPAY_WAIVER_PATIENT_COST_CONTEXT_VIEW)
+    summary.createOrReplaceTempView(COPAY_WAIVER_POPULATION_SUMMARY_VIEW)
+    segments.createOrReplaceTempView(COPAY_WAIVER_SEGMENT_BREAKDOWN_VIEW)
+    support_service_detail.createOrReplaceTempView(COPAY_WAIVER_SUPPORT_SERVICE_DETAIL_VIEW)
+    not_waived_patients.createOrReplaceTempView(COPAY_WAIVER_NOT_WAIVED_PATIENTS_VIEW)
+    cohort_diffs.createOrReplaceTempView(COPAY_WAIVER_COHORT_DIFFS_VIEW)
+    measure_diffs.createOrReplaceTempView(COPAY_WAIVER_MEASURE_DIFFS_VIEW)
+    stage_manifest.createOrReplaceTempView(COPAY_WAIVER_STAGE_MANIFEST_VIEW)
+    stage_metrics.createOrReplaceTempView(COPAY_WAIVER_STAGE_METRICS_VIEW)
+    check_results.createOrReplaceTempView(COPAY_WAIVER_CHECK_RESULTS_VIEW)
+    service_trace.createOrReplaceTempView(COPAY_WAIVER_SERVICE_TRACE_VIEW)
+
+    return {
+        **base_outputs,
+        "stage_manifest": stage_manifest,
+        "stage_metrics": stage_metrics,
+        "check_results": check_results,
+        "service_trace": service_trace,
         "performance_year": performance_year,
         "active_engaged_only": active_engaged_only,
         "source_tables": {

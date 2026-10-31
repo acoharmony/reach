@@ -50,6 +50,10 @@ Default UAT outputs are under `uat_sandbox.gov_programs`:
 - `reach_audit_copay_no_secondary_due_not_waived_patients`
 - `reach_audit_copay_cohort_diffs`
 - `reach_audit_copay_measure_diffs`
+- `reach_audit_copay_stage_manifest`
+- `reach_audit_copay_stage_metrics`
+- `reach_audit_copay_check_results`
+- `reach_audit_copay_service_trace`
 - `reach_audit_copay_run_summary`
 - `reach_audit_giftcards_distribution`
 - `reach_audit_giftcards_run_summary`
