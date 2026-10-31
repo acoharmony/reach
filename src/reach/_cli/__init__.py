@@ -17,7 +17,7 @@ from reach._tables import reach_environment
 ENV = reach_environment()
 DEFAULT_NOTES_TABLE = "uat_sandbox.gov_programs.reach_clinical_oversight_patient_notes"
 DISCUSSION_GROUP_CLINICIAN_NPIS = ("1568005569", "1922454586", "1417337247")
-DEFAULT_GIFTCARDS_SOURCE_PATH = f"{ENV.bronze_volume_root}/reach_audit_giftcards/reach_giftcards_2026.csv"
+DEFAULT_GIFTCARDS_SOURCE_PATH = f"{ENV.reach_audit_volume_root}/reach_giftcards_2026.csv"
 
 
 def _split_csv(value: str) -> tuple[str, ...]:

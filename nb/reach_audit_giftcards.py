@@ -18,8 +18,8 @@ from pyspark.sql import functions as F
 
 from reach._transforms._clinical_oversight._metrics import clinical_oversight_materialized_metric_labels
 
-SOURCE_CSV_PATH = "/Volumes/uat_sandbox/gov_programs/bronze/reach_audit_giftcards/reach_giftcards_2026.csv"
-COMPLETE_HISTORICAL_CSV_PATH = "/Volumes/uat_sandbox/gov_programs/bronze/reach_audit_giftcards/reach_gcm_all.csv"
+SOURCE_CSV_PATH = "/Volumes/uat_sandbox/gov_programs/reach_audit/reach_giftcards_2026.csv"
+COMPLETE_HISTORICAL_CSV_PATH = "/Volumes/uat_sandbox/gov_programs/reach_audit/reach_gcm_all.csv"
 TARGET_TABLE = "uat_sandbox.gov_programs.reach_audit_giftcards_distribution"
 PATIENT_METRICS_TABLE = "uat_sandbox.gov_programs.reach_audit_copay_patient_cost_context"
 

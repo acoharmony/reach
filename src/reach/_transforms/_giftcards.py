@@ -6,8 +6,9 @@ from pyspark.sql import DataFrame, functions as F
 
 from reach._transforms._registry import register_transform
 
-REACH_AUDIT_GIFTCARDS_2026_SOURCE_PATH = "/Volumes/uat_sandbox/gov_programs/bronze/reach_audit_giftcards/reach_giftcards_2026.csv"
-REACH_AUDIT_GIFTCARDS_COMPLETE_SOURCE_PATH = "/Volumes/uat_sandbox/gov_programs/bronze/reach_audit_giftcards/reach_gcm_all.csv"
+REACH_AUDIT_GIFTCARDS_VOLUME_ROOT = "/Volumes/uat_sandbox/gov_programs/reach_audit"
+REACH_AUDIT_GIFTCARDS_2026_SOURCE_PATH = f"{REACH_AUDIT_GIFTCARDS_VOLUME_ROOT}/reach_giftcards_2026.csv"
+REACH_AUDIT_GIFTCARDS_COMPLETE_SOURCE_PATH = f"{REACH_AUDIT_GIFTCARDS_VOLUME_ROOT}/reach_gcm_all.csv"
 REACH_AUDIT_GIFTCARDS_SOURCE_PATH = REACH_AUDIT_GIFTCARDS_2026_SOURCE_PATH
 REACH_AUDIT_GIFTCARDS_TABLE = "uat_sandbox.gov_programs.reach_audit_giftcards_distribution"
 REACH_AUDIT_GIFTCARDS_VIEW = "reach_audit_giftcards"
@@ -50,7 +51,7 @@ def _money_amount(column):
     "reach_audit_giftcards_distribution",
     concern="giftcards",
     output_table=REACH_AUDIT_GIFTCARDS_TABLE,
-    description="Load REACH gift-card distribution CSV from the UAT government programs bronze volume.",
+    description="Load REACH gift-card distribution CSV from the UAT government programs reach_audit volume.",
 )
 def build_reach_audit_giftcards_distribution(spark, *, source_csv_path: str = REACH_AUDIT_GIFTCARDS_SOURCE_PATH) -> DataFrame:
     """Load the REACH gift-card CSV with all source fields preserved as typed table columns."""
